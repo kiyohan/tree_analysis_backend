@@ -1,0 +1,28 @@
+dsi-backend/
+├── config/
+│   └── db.js               # MongoDB connection
+├── controllers/
+│   ├── auth.controller.js    # Handles login, user info
+│   ├── user.controller.js    # Admin user management
+│   ├── drawing.controller.js # Handles drawing submissions
+│   ├── case.controller.js    # Handles case review and management
+│   └── admin.controller.js   # Admin dashboard and actions
+├── middlewares/
+│   ├── auth.middleware.js    # JWT verification and role authorization (RBAC)
+│   └── upload.middleware.js  # Multer configuration for file uploads
+├── models/
+│   ├── User.model.js
+│   ├── Drawing.model.js
+│   └── Case.model.js
+├── routes/
+│   ├── index.js              # Main router file
+│   ├── auth.routes.js
+│   ├── user.routes.js
+│   ├── drawing.routes.js
+│   ├── case.routes.js
+│   └── admin.routes.js
+├── services/
+│   └── ml.service.js         # Logic to call the external ML/LLM API
+├── .env                      # Environment variables
+├── .gitignore
+└── server.js               # Main server entry point
