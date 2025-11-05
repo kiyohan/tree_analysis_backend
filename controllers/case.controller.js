@@ -1,4 +1,5 @@
 const Case = require('../models/Case.model');
+const { createLog } = require('../services/log.service');
 
 // @desc    Get cases assigned to the logged-in assessor
 // @route   GET /api/cases
@@ -51,6 +52,9 @@ exports.submitReview = async (req, res) => {
         caseItem.completedAt = new Date();
 
         await caseItem.save();
+
+        // ... in submitReview, after caseItem.save():
+        createLog(`Assessor '${req.user.username}' completed review for case of child '${caseItem.drawing.childId}'.`, req.user._id, caseItem._id);
 
         res.status(200).json(caseItem);
     } catch (error) {

@@ -1,6 +1,7 @@
 const Case = require('../models/Case.model');
 const User = require('../models/User.model');
 const Drawing = require('../models/Drawing.model');
+const Log = require('../models/Log.model'); 
 
 // @desc    Get dashboard analytics
 // @route   GET /api/admin/analytics
@@ -74,4 +75,19 @@ exports.reassignCase = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
+}
+
+// @desc    Get recent system logs
+// @route   GET /api/admin/logs
+// @access  Private (Admin)
+exports.getSystemLogs = async (req, res) => {
+    try {
+        const logs = await Log.find({})
+                              .sort({ createdAt: -1 })
+                              .limit(10) // Get the 10 most recent logs
+                              .populate('user', 'username'); 
+        res.status(200).json(logs);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
 };

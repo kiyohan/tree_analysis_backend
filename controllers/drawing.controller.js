@@ -1,6 +1,7 @@
 const Drawing = require('../models/Drawing.model');
 const Case = require('../models/Case.model');
 const mlService = require('../services/ml.service');
+const { createLog } = require('../services/log.service');
 
 // @desc    Submit a new drawing
 // @route   POST /api/drawings
@@ -34,6 +35,11 @@ exports.submitDrawing = async (req, res) => {
       flaggedAt: mlOutput.flaggedForReview ? new Date() : null,
       completedAt: !mlOutput.flaggedForReview ? new Date() : null,
     });
+    // ... in submitDrawing, after creating the newCase:
+    createLog(`Uploader '${req.user.username}' submitted drawing for child '${newDrawing.childId}'.`, req.user._id, newCase._id);
+    if (newCase.status === 'Flagged for Review') {
+        createLog(`Case for child '${newDrawing.childId}' was automatically flagged by ML engine.`, null, newCase._id);
+    }
 
     res.status(201).json({
       message: 'Drawing submitted and analysis initiated successfully.',
@@ -46,15 +52,25 @@ exports.submitDrawing = async (req, res) => {
   }
 };
 
-// @desc    Get drawings submitted by the logged-in uploader
+// @desc    Get drawings submitted by the logged-in uploader WITH case status
 // @route   GET /api/drawings
 // @access  Private (Uploader)
 exports.getMyDrawings = async (req, res) => {
     try {
         const drawings = await Drawing.find({ uploader: req.user.id }).sort({ createdAt: -1 });
-        // You might want to also populate the case status for each drawing here
-        res.status(200).json(drawings);
+
+        // For each drawing, find its corresponding case
+        const drawingsWithCases = await Promise.all(drawings.map(async (drawing) => {
+            const caseItem = await Case.findOne({ drawing: drawing._id });
+            return {
+                ...drawing.toObject(),
+                caseStatus: caseItem ? caseItem.status : 'Processing'
+            };
+        }));
+        
+        res.status(200).json(drawingsWithCases);
     } catch (error) {
+        console.error('Error fetching my drawings:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };

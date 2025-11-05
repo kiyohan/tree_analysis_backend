@@ -1,5 +1,6 @@
 const User = require('../models/User.model');
 const jwt = require('jsonwebtoken');
+const { createLog } = require('../services/log.service');
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -28,6 +29,8 @@ exports.login = async (req, res) => {
       role: user.role,
     },
   });
+  // ... in login function, after successful login:
+  createLog(`User '${user.username}' logged in.`, user._id);
 };
 
 // @desc    Get current logged in user
