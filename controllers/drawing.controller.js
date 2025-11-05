@@ -1,6 +1,7 @@
 const Drawing = require('../models/Drawing.model');
 const Case = require('../models/Case.model');
 const mlService = require('../services/ml.service');
+const { getNextAssessor } = require('../services/assignment.service'); 
 const { createLog } = require('../services/log.service');
 
 // @desc    Submit a new drawing
@@ -21,25 +22,45 @@ exports.submitDrawing = async (req, res) => {
       childId,
       childAge,
       teacherNotes,
-      imageURL: req.file.path, // URL from Cloudinary
+      imageURL: req.file.path,
     });
 
-    // 2. Trigger ML Analysis (asynchronously, but we'll await it here for simplicity)
+    // 2. Trigger ML Analysis
     const mlOutput = await mlService.analyzeDrawing(newDrawing.imageURL);
 
-    // 3. Create a Case based on the drawing and ML output
+    // 3. Check if the case is flagged for review
+    const isFlagged = mlOutput.flaggedForReview;
+    let assignedAssessorId = null;
+
+    // --- AUTOMATIC ASSIGNMENT LOGIC ---
+    if (isFlagged) {
+      // If flagged, find the next available assessor
+      assignedAssessorId = await getNextAssessor();
+    }
+    // ------------------------------------
+
+    // 4. Create a Case based on the drawing and ML output
     const newCase = await Case.create({
       drawing: newDrawing._id,
+      assessor: assignedAssessorId, // Assign the case here
       mlOutput,
-      status: mlOutput.flaggedForReview ? 'Flagged for Review' : 'Completed - No Concerns',
-      flaggedAt: mlOutput.flaggedForReview ? new Date() : null,
-      completedAt: !mlOutput.flaggedForReview ? new Date() : null,
+      status: isFlagged ? 'Flagged for Review' : 'Completed - No Concerns',
+      flaggedAt: isFlagged ? new Date() : null,
+      completedAt: !isFlagged ? new Date() : null,
     });
-    // ... in submitDrawing, after creating the newCase:
+    
+    // 5. Create logs for the actions
     createLog(`Uploader '${req.user.username}' submitted drawing for child '${newDrawing.childId}'.`, req.user._id, newCase._id);
-    if (newCase.status === 'Flagged for Review') {
+    if (isFlagged) {
         createLog(`Case for child '${newDrawing.childId}' was automatically flagged by ML engine.`, null, newCase._id);
+        if (assignedAssessorId) {
+            const assignedUser = await require('../models/User.model').findById(assignedAssessorId).select('username');
+            createLog(`Case automatically assigned to '${assignedUser.username}'.`, null, newCase._id);
+        } else {
+            createLog(`Case requires manual assignment (no active assessors available).`, null, newCase._id);
+        }
     }
+
 
     res.status(201).json({
       message: 'Drawing submitted and analysis initiated successfully.',
@@ -51,6 +72,8 @@ exports.submitDrawing = async (req, res) => {
     res.status(500).json({ message: 'Server error during drawing submission.' });
   }
 };
+
+// ... the getMyDrawings function remains the same
 
 // @desc    Get drawings submitted by the logged-in uploader WITH case status
 // @route   GET /api/drawings
